@@ -1,0 +1,127 @@
+<?php
+
+/**
+ * @file
+ * Contains idix_rwd_image.module.
+ */
+
+use Drupal\Core\Routing\RouteMatchInterface;
+use Drupal\Core\Template\Attribute;
+use Drupal\image\Entity\ImageStyle;
+
+/**
+ * Implements hook_help().
+ */
+function idix_rwd_image_help($route_name, RouteMatchInterface $route_match) {
+  switch ($route_name) {
+    // Main module help for the idix_rwd_image module.
+    case 'help.page.idix_rwd_image':
+      $output = '';
+      $output .= '<h3>' . t('About') . '</h3>';
+      $output .= '<p>' . t('Gestion des images responsive sans utiliser le site building.') . '</p>';
+      return $output;
+
+    default:
+  }
+}
+
+/**
+ * Implements hook_theme().
+ */
+function idix_rwd_image_theme() {
+  return [
+    'rwd_image' => [
+      'variables' => [
+        'uri' => NULL,
+        'alt' => '',
+        'fallback' => NULL,
+        'attributes' => [],
+        'breakpoints' => []
+      ]
+    ],
+  ];
+}
+
+/**
+ * Implements hook_preprocess_rwd_image().
+ */
+function idix_rwd_image_preprocess_rwd_image(array &$variables) {
+  $uri = $variables['uri'];
+
+  // Prepare img element
+  // Theme 'image_style' is not used because of its auto generated width and height attributes
+  // which causes conflicts with sizes attributes and the browser rendering dimensions
+  $variables['img_element'] = [
+    '#theme' => 'image',
+    '#uri' => $uri,
+    '#style_name' => $variables['fallback'],
+    '#alt' => $variables['alt']
+  ];
+
+  if ($style = ImageStyle::load($variables['fallback'])) {
+    if ($style->supportsUri($uri)) {
+      $variables['img_element']['#uri'] = $style->buildUrl($uri);
+    }
+  }
+
+  // Prepare sources
+  $variables['output'] = 'picture';
+  if (count($variables['breakpoints']) === 1 && !isset($variables['breakpoints'][0]['media'])) {
+    $variables['output'] = 'img';
+    if ($attributes = _idix_rwd_image_get_breakpoint_source_attr($uri, $variables['breakpoints'][0])) {
+      $variables['img_element']['attributes'] = $attributes;
+    }
+  }
+  else {
+    $variables['picture_attributes'] = new Attribute($variables['attributes']);
+    $variables['sources'] = [];
+    foreach ($variables['breakpoints'] as $breakpoint) {
+      if ($source = _idix_rwd_image_get_breakpoint_source_attr($uri, $breakpoint)) {
+        $variables['sources'][] = $source;
+      }
+    }
+  }
+
+  $variables['#attached']['library'][] = 'core/picturefill';
+
+  unset($variables['alt']);
+  unset($variables['fallback']);
+  unset($variables['attributes']);
+  unset($variables['breakpoints']);
+}
+
+function _idix_rwd_image_get_breakpoint_source_attr ($uri, $breakpoint) {
+  $source = [
+    'media' => isset($breakpoint['media']) ? $breakpoint['media'] : NULL,
+    'sizes' => isset($breakpoint['sizes']) ? implode(', ', $breakpoint['sizes']) : NULL,
+    'srcset' => []
+  ];
+
+  if (isset($breakpoint['image_styles'])) {
+    foreach ($breakpoint['image_styles'] as $image_style) {
+      $style = ImageStyle::load($image_style);
+      if ($style) {
+        // dimensions de l'image originale
+        $image = \Drupal::service('image.factory')->get($uri);
+        $dimensions = [
+          'width' => $image->getWidth(),
+          'height' => $image->getHeight()
+        ];
+
+        // dimensions de l'image après transformations du style d'image
+        // pour récupérer le descripteur 'w' (width)
+        $style->transformDimensions($dimensions, $uri);
+        $url = file_url_transform_relative($style->buildUrl($uri));
+        $source['srcset'][] = $url . ' ' . $dimensions['width'] . 'w';
+      }
+    }
+  }
+
+  $source['srcset'] = implode(', ', $source['srcset']);
+
+  if (empty($source['srcset'])) {
+    return NULL;
+  }
+
+  return new Attribute($source);
+}

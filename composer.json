@@ -1,0 +1,16 @@
+{
+  "name": "idix/idix_rwd_image",
+  "type": "drupal-custom-module",
+  "description": "Gestion des images responsive sans utiliser le site building.",
+  "keywords": ["Drupal", "image", "responsive", "rwd"],
+  "authors": [
+    {
+      "name": "Thierry Langlois",
+      "email": "thierry.langlois@idix.fr",
+      "role": "Maintainer"
+    }
+  ],
+  "require": {
+    "drupal/core": "8.*"
+  }
+}

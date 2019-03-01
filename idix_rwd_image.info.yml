@@ -1,0 +1,5 @@
+name: 'IDIX RWD Image'
+type: module
+description: 'Gestion des images responsive sans utiliser le site building.'
+core: 8.x
+package: 'IDIX'
